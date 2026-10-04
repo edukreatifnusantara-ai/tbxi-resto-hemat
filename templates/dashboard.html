@@ -1,0 +1,1228 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#ea580c">
+  <title>RESTO-AI HEMAT - Dashboard Keuangan & Operasional</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- Lucide Icons CDN -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
+    body { font-family: 'Plus Jakarta Sans', sans-serif; }
+    .card-shadow { box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.05), 0 2px 6px -1px rgba(0, 0, 0, 0.02); }
+    .tab-active { border-bottom: 2px solid #ea580c; color: #ea580c; font-weight: 700; }
+    @media print {
+      header, nav, button, .no-print { display: none !important; }
+      body { background: white; color: black; }
+      .tab-content { display: block !important; }
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col">
+
+  <!-- TOP HEADER -->
+  <header class="bg-white border-b border-slate-200 sticky top-0 z-40">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-amber-500 via-orange-600 to-red-600 flex items-center justify-center text-white font-extrabold shadow-md shadow-orange-500/20">
+          NU
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 id="biz-name" class="font-extrabold text-slate-900 text-lg leading-tight">NAMA USAHA</h1>
+            <span class="text-[10px] px-2 py-0.5 rounded-full bg-sky-600 text-white font-extrabold tracking-wide">HEMAT</span>
+            <span class="text-[10px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold flex items-center gap-1">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse"></span> OPERASIONAL LIVE
+            </span>
+          </div>
+          <p class="text-xs text-slate-500"><span id="biz-location">Lokasi Usaha</span> • Dashboard Keuangan & Operasional • <span class="text-orange-600 font-bold">by TBXI edukreativ.id</span></p>
+        </div>
+      </div>
+      <div class="flex items-center gap-2 sm:gap-3">
+                <a href="/dapur" target="_blank" class="px-3 py-1.5 rounded-lg bg-amber-500/10 text-amber-700 border border-amber-500/30 text-xs font-bold hover:bg-amber-500/20 flex items-center gap-1.5 transition">
+          🍳 <span class="hidden sm:inline">Layar Dapur</span> (KDS)
+        </a>
+        <button onclick="fetchData()" class="px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-100 flex items-center gap-1.5 transition">
+          <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> <span class="hidden sm:inline">Refresh Data</span>
+        </button>
+        <button onclick="exportFullDataCSV()" class="px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-100 flex items-center gap-1.5 transition">
+          <i data-lucide="download" class="w-3.5 h-3.5"></i> <span class="hidden sm:inline">Ekspor CSV</span>
+        </button>
+        <button onclick="window.print()" class="px-3 py-1.5 rounded-lg bg-orange-600 text-white text-xs font-semibold hover:bg-orange-700 flex items-center gap-1.5 shadow-sm transition">
+          <i data-lucide="printer" class="w-3.5 h-3.5"></i> Cetak Laporan
+        </button>
+        <a href="/logout" title="Kunci Akses" class="px-3 py-1.5 rounded-lg border border-rose-200 bg-rose-50 text-xs font-semibold text-rose-600 hover:bg-rose-100 flex items-center gap-1.5 transition">
+          <i data-lucide="lock" class="w-3.5 h-3.5"></i> <span class="hidden sm:inline">Kunci</span>
+        </a>
+      </div>
+    </div>
+
+    <!-- NAVIGATION TABS -->
+    <nav class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex overflow-x-auto gap-2 text-xs text-slate-600 font-semibold border-t border-slate-100 no-print">
+      <!-- Tab = tombol navigasi: klik untuk pindah panel laporan -->
+      <style>
+        .tab-btn { cursor: pointer; border-radius: 0.5rem 0.5rem 0 0; transition: background .15s, color .15s; }
+        .tab-btn:hover { background: #fff7ed; color: #ea580c; }
+        .tab-btn.tab-active { background: #ffedd5; color: #c2410c; }
+      </style>
+      <button type="button" onclick="switchTab('overview')" id="tab-btn-overview" class="tab-btn px-4 py-3 tab-active flex items-center gap-1.5 whitespace-nowrap">
+        <i data-lucide="layout-dashboard" class="w-4 h-4"></i> Overview Eksekutif
+      </button>
+      <button type="button" onclick="switchTab('pnl')" id="tab-btn-pnl" class="tab-btn px-4 py-3 flex items-center gap-1.5 whitespace-nowrap hover:text-slate-800">
+        <i data-lucide="file-text" class="w-4 h-4"></i> Laba Rugi (P&L)
+      </button>
+      <button type="button" onclick="switchTab('purchasing')" id="tab-btn-purchasing" class="tab-btn px-4 py-3 flex items-center gap-1.5 whitespace-nowrap hover:text-slate-800">
+        <i data-lucide="shopping-cart" class="w-4 h-4"></i> Belanja & Pengeluaran
+      </button>
+      <button type="button" onclick="switchTab('menu')" id="tab-btn-menu" class="tab-btn px-4 py-3 flex items-center gap-1.5 whitespace-nowrap hover:text-slate-800">
+        <i data-lucide="utensils" class="w-4 h-4"></i> Menu Terlaris
+      </button>
+    </nav>
+  </header>
+
+  <!-- MAIN CONTAINER -->
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-1 w-full space-y-8">
+
+    <!-- ============================================================== -->
+    <!-- TAB 1: OVERVIEW EKSEKUTIF -->
+    <!-- ============================================================== -->
+    <div id="data-error-box" class="hidden max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-800 text-xs font-bold px-4 py-2"></div>
+
+    <div id="tab-overview" class="tab-content space-y-6">
+      <!-- HERO BANNER -->
+      <div class="bg-gradient-to-r from-slate-900 via-slate-800 to-indigo-950 rounded-2xl p-6 sm:p-8 text-white relative overflow-hidden shadow-xl">
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+          <div>
+            <span class="text-xs uppercase tracking-wider text-orange-400 font-bold">Periode Pembukuan Riil</span>
+            <h2 id="hero-period" class="text-xl sm:text-2xl font-bold mt-1 text-white">Memuat...</h2>
+            <p class="text-xs text-slate-400 mt-2">Buku Harian Pembukuan Usaha</p>
+          </div>
+          <div>
+            <span class="text-xs uppercase tracking-wider text-slate-400 font-medium">Total Akumulasi Omzet</span>
+            <h3 id="hero-total-omzet" class="text-2xl sm:text-3xl font-extrabold mt-1 text-emerald-400">Rp 0</h3>
+            <p id="hero-avg-omzet" class="text-xs text-slate-300 mt-1">Rata-rata: Rp 0 / hari</p>
+          </div>
+          <div>
+            <span class="text-xs uppercase tracking-wider text-slate-400 font-medium">Beban Tetap Bulanan</span>
+            <h3 id="hero-fixed-cost" class="text-2xl sm:text-3xl font-extrabold mt-1 text-orange-400">Rp 9.020.000</h3>
+            <p class="text-xs text-slate-300 mt-1">3 Karyawan (7,5jt) + Sewa (1,2jt) + Utilitas (320rb)</p>
+          </div>
+          <div>
+            <span class="text-xs uppercase tracking-wider text-slate-400 font-medium">Laba Bersih Akumulasi</span>
+            <h3 id="hero-net-profit" class="text-2xl sm:text-3xl font-extrabold mt-1 text-cyan-300">Rp 0</h3>
+            <p id="hero-margin" class="text-xs text-emerald-300 mt-1">Margin: 0% Bersih</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- 6 METRIC CARDS -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+        <div class="bg-white p-4 rounded-xl border border-slate-200 card-shadow">
+          <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Omzet Harian</span>
+          <h4 id="ov-omzet" class="text-lg font-extrabold text-slate-900 mt-1">Rp 0</h4>
+          <span class="text-[10px] text-emerald-600 font-medium flex items-center gap-1 mt-1">
+            <i data-lucide="trending-up" class="w-3 h-3"></i> Rata-rata 28 Hari
+          </span>
+        </div>
+        <div class="bg-white p-4 rounded-xl border border-slate-200 card-shadow">
+          <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">HPP Bahan Baku</span>
+          <h4 id="ov-hpp" class="text-lg font-extrabold text-slate-900 mt-1">Rp 0</h4>
+          <span class="text-[10px] text-amber-600 font-medium flex items-center gap-1 mt-1">
+            <i data-lucide="pie-chart" class="w-3 h-3"></i> <span id="ov-hpp-ratio">…</span>
+          </span>
+        </div>
+        <div class="bg-white p-4 rounded-xl border border-slate-200 card-shadow">
+          <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Beban Tetap Harian</span>
+          <h4 id="ov-fixed" class="text-lg font-extrabold text-slate-900 mt-1">Rp 933.333</h4>
+          <span class="text-[10px] text-blue-600 font-medium flex items-center gap-1 mt-1">
+            <i data-lucide="users" class="w-3 h-3"></i> 3 Personil + Utilitas
+          </span>
+        </div>
+        <div class="bg-white p-4 rounded-xl border border-slate-200 card-shadow">
+          <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Laba Bersih Harian</span>
+          <h4 id="ov-profit" class="text-lg font-extrabold text-slate-900 mt-1">Rp 0</h4>
+          <span class="text-[10px] text-purple-600 font-medium flex items-center gap-1 mt-1">
+            <i data-lucide="award" class="w-3 h-3"></i> <span id="ov-margin-note">…</span>
+          </span>
+        </div>
+        <div class="bg-white p-4 rounded-xl border border-slate-200 card-shadow">
+          <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Laju Pertumbuhan</span>
+          <h4 id="kpi-growth" class="text-lg font-extrabold text-emerald-600 mt-1">— % MoM</h4>
+          <span class="text-[10px] text-emerald-700 font-medium flex items-center gap-1 mt-1">
+            <i data-lucide="trending-up" class="w-3 h-3"></i> Rata-rata 6 Bulan
+          </span>
+        </div>
+        <div class="bg-white p-4 rounded-xl border border-slate-200 card-shadow">
+          <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Total Omzet 6 Bulan</span>
+          <h4 id="ov-alltime" class="text-lg font-extrabold text-indigo-900 mt-1">Rp 0</h4>
+          <span class="text-[10px] text-indigo-600 font-medium flex items-center gap-1 mt-1">
+            <i data-lucide="check-circle" class="w-3 h-3"></i> Produk Siap Jual
+          </span>
+        </div>
+      </div>
+
+      <!-- 6-MONTH GROWTH SHOWCASE BANNER & CHART (PRODUK SIAP JUAL) -->
+      <div class="bg-white rounded-2xl border border-slate-200 card-shadow p-6 sm:p-8 space-y-6">
+        <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-100 pb-5">
+          <div>
+            <div class="flex items-center gap-2 flex-wrap">
+              <span class="px-3 py-1 rounded-full text-xs font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-1.5">
+                <i data-lucide="trending-up" class="w-3.5 h-3.5 text-emerald-600"></i> Pertumbuhan Variatif +6,4% MoM
+              </span>
+              <span class="px-3 py-1 rounded-full text-xs font-extrabold bg-orange-100 text-orange-800 border border-orange-200">
+                ⭐ Demo Produk Siap Jual
+              </span>
+              <span class="px-3 py-1 rounded-full text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                5 Bulan Historis + Data Riil Final
+              </span>
+            </div>
+            <h3 class="text-lg sm:text-xl font-extrabold text-slate-900 mt-2 flex items-center gap-2">
+              <i data-lucide="bar-chart-2" class="w-5 h-5 text-orange-600"></i> Tren Pertumbuhan Finansial 6 Bulan (MoM +6,4% Rata-rata)
+            </h3>
+            <p class="text-xs text-slate-500 mt-1">
+              Rekam jejak performa finansial resto dengan pertumbuhan terukur 7% setiap bulannya, membuktikan validasi produk Resto-AI siap diadopsi multi-cabang.
+            </p>
+          </div>
+          <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 text-right">
+            <div class="bg-slate-50 border border-slate-200 rounded-xl p-3">
+              <span class="text-[10px] text-slate-500 font-bold uppercase block">Akumulasi Omzet 6 Bln</span>
+              <span id="six-mo-omzet" class="text-sm sm:text-base font-extrabold text-emerald-700">Rp 0</span>
+            </div>
+            <div class="bg-slate-50 border border-slate-200 rounded-xl p-3">
+              <span class="text-[10px] text-slate-500 font-bold uppercase block">Akumulasi Laba Bersih</span>
+              <span id="six-mo-profit" class="text-sm sm:text-base font-extrabold text-indigo-700">Rp 0</span>
+            </div>
+            <div class="bg-slate-50 border border-slate-200 rounded-xl p-3 col-span-2 sm:col-span-1">
+              <span class="text-[10px] text-slate-500 font-bold uppercase block">Laju MoM Teruji</span>
+              <span class="text-sm sm:text-base font-extrabold text-orange-600">+6,4% / Bulan</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 6-MONTH CHART & INSIGHT -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div class="lg:col-span-2">
+            <div class="flex items-center justify-between mb-3">
+              <span class="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                <i data-lucide="layers" class="w-4 h-4 text-emerald-600"></i> Grafik Omzet (Bar Hijau), HPP Bahan (Bar Oranye) & Laba Bersih (Garis Indigo)
+              </span>
+              <span class="text-[11px] text-slate-400 font-medium">Satuan: Juta Rupiah</span>
+            </div>
+            <div class="relative h-72 sm:h-80 w-full">
+              <canvas id="monthlyGrowthChart"></canvas>
+            </div>
+          </div>
+          <div class="space-y-4 flex flex-col justify-between">
+            <div class="bg-gradient-to-br from-emerald-50 to-teal-50 rounded-2xl p-5 border border-emerald-200 space-y-3">
+              <div class="flex items-center gap-2 text-emerald-900 font-extrabold text-sm">
+                <i data-lucide="sparkles" class="w-4 h-4 text-emerald-600"></i> Insight Kinerja Produk Siap Jual
+              </div>
+              <p class="text-xs text-emerald-800 leading-relaxed" id="h-insight-narrative">
+                …
+              </p>
+              <div class="pt-2 border-t border-emerald-200/60 flex justify-between text-xs text-emerald-950 font-bold">
+                <span>Peningkatan Laba Bersih:</span>
+                <span class="text-emerald-700 font-extrabold" id="h-insight-laba-delta">…</span>
+              </div>
+            </div>
+
+            <div class="bg-slate-50 rounded-2xl p-4 border border-slate-200 text-xs space-y-2.5">
+              <div class="font-bold text-slate-800 flex items-center justify-between">
+                <span>Rata-rata Margin Bersih:</span>
+                <span class="text-indigo-700 font-extrabold text-sm">26,9% Rata-rata</span>
+              </div>
+              <div class="font-bold text-slate-800 flex items-center justify-between">
+                <span>Food Cost HPP:</span>
+                <span class="text-amber-800 font-extrabold text-sm">40,8% (Terkontrol Ketat)</span>
+              </div>
+              <div class="font-bold text-slate-800 flex items-center justify-between">
+                <span>Total Pesanan Sukses (DB):</span>
+                <span class="text-slate-900 font-extrabold text-sm" id="six-mo-orders">— Transaksi</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 6-MONTH SUMMARY TABLE -->
+        <div class="space-y-2">
+          <h4 class="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+            <i data-lucide="table" class="w-4 h-4 text-slate-500"></i> Rekapitulasi Finansial 6 Bulan (5 Bulan Historis + Data Riil Final)
+          </h4>
+          <div class="overflow-x-auto rounded-xl border border-slate-200">
+            <table class="w-full text-left border-collapse text-xs">
+              <thead class="bg-slate-100 text-slate-700 font-bold border-b border-slate-200">
+                <tr>
+                  <th class="py-3 px-4">Bulan / Periode</th>
+                  <th class="py-3 px-4 text-emerald-700">Omzet Penjualan</th>
+                  <th class="py-3 px-4 text-amber-700">HPP Bahan Baku</th>
+                  <th class="py-3 px-4 text-slate-800">Laba Kotor</th>
+                  <th class="py-3 px-4 text-slate-600">Beban Tetap Ops</th>
+                  <th class="py-3 px-4 text-indigo-800 font-bold">Laba Bersih</th>
+                  <th class="py-3 px-4 text-center">Margin %</th>
+                  <th class="py-3 px-4 text-center text-emerald-600">Pertumbuhan MoM</th>
+                  <th class="py-3 px-4 text-center">Status Data</th>
+                </tr>
+              </thead>
+              <tbody id="monthly-growth-table-body" class="divide-y divide-slate-100 bg-white">
+                <!-- Dynamically populated -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- CHARTS ROW: TREND & COMPOSITION -->
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div class="lg:col-span-2 bg-white p-6 rounded-2xl border border-slate-200 card-shadow">
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <h3 class="font-bold text-slate-900 text-sm flex items-center gap-2">
+                <i data-lucide="line-chart" class="w-4 h-4 text-orange-600"></i> Tren Finansial Harian (28 Hari Riil)
+              </h3>
+              <p class="text-xs text-slate-500">Perbandingan Omzet Penjualan vs HPP Bahan Baku vs Laba Bersih</p>
+            </div>
+          </div>
+          <div class="relative h-72 sm:h-80 w-full">
+            <canvas id="trendChart"></canvas>
+          </div>
+        </div>
+        <div class="bg-white p-6 rounded-2xl border border-slate-200 card-shadow flex flex-col justify-between">
+          <div>
+            <h3 class="font-bold text-slate-900 text-sm flex items-center gap-2 mb-2">
+              <i data-lucide="pie-chart" class="w-4 h-4 text-orange-600"></i> Struktur Biaya Operasional Total
+            </h3>
+            <p class="text-xs text-slate-500 mb-3">Distribusi seluruh pengeluaran bulanan resto</p>
+            <div class="relative h-56 w-full flex items-center justify-center">
+              <canvas id="costChart"></canvas>
+            </div>
+          </div>
+          <div class="mt-4 pt-3 border-t border-slate-100 text-xs space-y-1 text-slate-600">
+            <div class="flex justify-between"><span>Gaji &amp; Payroll:</span><b class="text-slate-800" id="cs-h-payroll">…</b></div>
+            <div class="flex justify-between"><span>Sewa Tempat:</span><b class="text-slate-800" id="cs-h-rent">…</b></div>
+            <div class="flex justify-between"><span>Utilitas (Listrik/Air):</span><b class="text-slate-800" id="cs-h-util">…</b></div>
+          </div>
+        </div>
+      </div>
+      </div><!-- /tab-overview -->
+
+      <div id="tab-pnl" class="tab-content hidden space-y-6">
+      <div class="bg-white rounded-2xl border border-slate-200 card-shadow p-6 sm:p-8 space-y-6">
+        <div class="border-b border-slate-200 pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <h2 class="text-lg font-extrabold text-slate-900 flex items-center gap-2">
+              <i data-lucide="file-text" class="w-5 h-5 text-orange-600"></i> Laporan Laba Rugi Komprehensif (Income Statement)
+            </h2>
+            <p class="text-xs text-slate-500">Standar pelaporan keuangan bisnis kuliner Anda</p>
+          </div>
+          <span class="px-3 py-1 bg-slate-100 text-slate-700 font-bold text-xs rounded-lg border border-slate-200">
+            Periode: 28 Hari Operasional Riil
+          </span>
+        </div>
+
+        <!-- FORMAL P&L BREAKDOWN TABLE -->
+        <div class="max-w-4xl mx-auto bg-slate-50 rounded-xl p-6 border border-slate-200 text-xs space-y-4">
+          <!-- 1. PENDAPATAN -->
+          <div>
+            <div class="flex justify-between font-extrabold text-slate-900 border-b border-slate-300 pb-1.5 text-sm">
+              <span>1. PENDAPATAN OPERASIONAL (REVENUE)</span>
+              <span id="pnl-rev-total" class="text-emerald-700">…</span>
+            </div>
+            <div class="pl-4 pt-2 space-y-1.5 text-slate-600">
+              <div class="flex justify-between"><span>Penjualan Makanan</span><span id="pnl-rev-food">…</span></div>
+              <div class="flex justify-between"><span>Penjualan Minuman & Aneka Snack</span><span id="pnl-rev-drink">…</span></div>
+            </div>
+          </div>
+
+          <!-- 2. HPP -->
+          <div>
+            <div class="flex justify-between font-extrabold text-slate-900 border-b border-slate-300 pb-1.5 text-sm">
+              <span>2. HARGA POKOK PENJUALAN (HPP / COGS)</span>
+              <span id="pnl-cogs-total" class="text-amber-800">…</span>
+            </div>
+            <div class="pl-4 pt-2 space-y-1.5 text-slate-600">
+              <div class="flex justify-between"><span>Bahan Baku Makanan</span><span id="pnl-cogs-food">…</span></div>
+              <div class="flex justify-between"><span>Bahan Baku Minuman</span><span id="pnl-cogs-bev">…</span></div>
+              <div class="flex justify-between font-semibold text-amber-900"><span>Rasio Food Cost</span><span id="pnl-cogs-ratio">…</span></div>
+            </div>
+          </div>
+
+          <!-- 3. LABA KOTOR -->
+          <div class="p-3 bg-emerald-50 rounded-lg border border-emerald-200 flex justify-between font-extrabold text-emerald-900 text-sm">
+            <span>3. LABA KOTOR (GROSS PROFIT)</span>
+            <span id="pnl-gross-profit">…</span>
+          </div>
+
+          <!-- 4. BEBAN OPERASIONAL -->
+          <div>
+            <div class="flex justify-between font-extrabold text-slate-900 border-b border-slate-300 pb-1.5 text-sm">
+              <span>4. BEBAN OPERASIONAL & BIAYA TETAP (OPEX)</span>
+              <span id="pnl-opex-total" class="text-rose-800">…</span>
+            </div>
+            <div id="pnl-opex-items" class="pl-4 pt-2 space-y-1.5 text-slate-600"></div>
+          </div>
+
+          <!-- 5. LABA BERSIH -->
+          <div class="p-4 bg-indigo-50 rounded-xl border border-indigo-200 flex justify-between font-extrabold text-indigo-950 text-base">
+            <div>
+              <span>5. LABA BERSIH OPERASIONAL (NET PROFIT)</span>
+              <p class="text-[10px] text-indigo-600 font-normal mt-0.5">Keuntungan bersih setelah seluruh gaji manajemen, staf, dan pengeluaran</p>
+            </div>
+            <span id="pnl-net-profit" class="text-right">…</span>
+          </div>
+        </div>
+
+        <!-- TABEL RINCIAN P&L HARIAN -->
+        <div class="space-y-3">
+          <div class="flex items-center justify-between">
+            <h3 class="font-bold text-slate-800 text-sm">Rekapitulasi Laba Rugi Harian (28 Hari)</h3>
+            <input type="text" id="searchPnlTable" onkeyup="filterPnlTable()" placeholder="Cari tanggal..." class="px-3 py-1.5 border border-slate-200 rounded-lg text-xs focus:ring-2 focus:ring-orange-500">
+          </div>
+          <div class="overflow-x-auto max-h-80 rounded-xl border border-slate-200">
+            <table class="w-full text-left border-collapse text-xs" id="pnlTable">
+              <thead class="bg-slate-100 text-slate-700 font-bold sticky top-0 border-b border-slate-200">
+                <tr>
+                  <th class="py-2.5 px-4">Tanggal</th>
+                  <th class="py-2.5 px-4 text-emerald-700">Estimasi Omzet</th>
+                  <th class="py-2.5 px-4 text-amber-700">HPP Bahan Baku</th>
+                  <th class="py-2.5 px-4 text-slate-800">Laba Kotor</th>
+                  <th class="py-2.5 px-4 text-rose-700">Beban Tetap Harian</th>
+                  <th class="py-2.5 px-4 text-indigo-800 font-bold">Laba Bersih</th>
+                  <th class="py-2.5 px-4">Margin %</th>
+                </tr>
+              </thead>
+              <tbody id="pnl-table-body" class="divide-y divide-slate-100 bg-white">
+                <!-- Dynamically populated -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================================================== -->
+    <!-- TAB 3: BELANJA & PENGELUARAN (PROCUREMENT) -->
+    <!-- ============================================================== -->
+    <div id="tab-purchasing" class="tab-content hidden space-y-6">
+      <div class="bg-white rounded-2xl border border-slate-200 card-shadow p-6 sm:p-8 space-y-6">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 pb-4">
+          <div>
+            <h2 class="text-lg font-extrabold text-slate-900 flex items-center gap-2">
+              <i data-lucide="shopping-bag" class="w-5 h-5 text-indigo-600"></i> Rekapitulasi Belanja Harian & Belanja Operasional Lainnya
+            </h2>
+            <p class="text-xs text-slate-500">Arus kas keluar: Pasar dapur, minuman, serta operasional non-bahan (Gas, Galon, Tisu, Nota, Plastik)</p>
+          </div>
+          <span id="h-pur-badge" class="px-3 py-1 bg-indigo-50 text-indigo-700 text-xs font-bold rounded-lg border border-indigo-200">
+            Total Belanja: …
+          </span>
+        </div>
+
+        <!-- KARTU TOTAL BELANJA (type HEMAT: tanpa breakdown kategori) -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div class="p-4 rounded-xl bg-slate-50 border border-slate-200">
+            <span class="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block">Total Belanja Masuk</span>
+            <h4 id="h-pur-total" class="text-lg font-bold text-slate-900 mt-1">…</h4>
+            <span id="h-pur-period" class="text-[10px] text-slate-400">…</span>
+          </div>
+          <div class="p-4 rounded-xl bg-indigo-50 border border-indigo-200">
+            <span class="text-[11px] font-semibold text-indigo-700 uppercase tracking-wider block">Rata-rata per Entri</span>
+            <h4 id="h-pur-avg" class="text-lg font-bold text-indigo-900 mt-1">…</h4>
+            <span id="h-pur-count" class="text-[10px] text-indigo-600 font-medium">…</span>
+          </div>
+        </div>
+
+        <!-- TABEL LOG BELANJA DENGAN TOMBOL LIHAT NOTA -->
+        <div class="overflow-hidden rounded-xl border border-slate-200">
+          <div class="p-4 bg-slate-50 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h3 class="font-bold text-slate-800 text-sm flex items-center gap-1.5">
+                <i data-lucide="clipboard" class="w-4 h-4 text-indigo-600"></i> Tabel Log Belanja Harian Masuk (28 Hari)
+              </h3>
+              <p class="text-[11px] text-slate-500">Klik tombol "Lihat Nota/Item" untuk melihat detail belanjaan per tanggal</p>
+            </div>
+            <input type="text" id="searchBelanja" onkeyup="filterBelanjaTable()" placeholder="Cari tanggal belanja..." class="px-3 py-1.5 border border-slate-200 rounded-lg text-xs focus:ring-2 focus:ring-indigo-500">
+          </div>
+          <div class="overflow-x-auto max-h-80">
+            <table class="w-full text-left border-collapse text-xs" id="belanjaTable">
+              <thead class="bg-slate-100 text-slate-700 font-bold sticky top-0 border-b border-slate-200">
+                <tr>
+                  <th class="py-2.5 px-4">Tanggal</th>
+                  <th class="py-2.5 px-4 text-indigo-950 font-extrabold">Total Belanja Masuk</th>
+                  <th class="py-2.5 px-4 text-center">Jumlah Item</th>
+                  <th class="py-2.5 px-4 text-center">Aksi</th>
+                </tr>
+              </thead>
+              <tbody id="belanja-table-body" class="divide-y divide-slate-100 bg-white">
+                <!-- Dynamically populated -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================================================== -->
+    <!-- TAB 4: MENU ENGINEERING & PENJUALAN -->
+    <!-- ============================================================== -->
+    <div id="tab-menu" class="tab-content hidden space-y-6">
+      <div class="bg-white rounded-2xl border border-slate-200 card-shadow p-6 sm:p-8 space-y-6">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100 pb-5">
+          <div class="flex items-center gap-2">
+            <span class="p-2 rounded-xl bg-orange-100 text-orange-600">
+              <i data-lucide="flame" class="w-5 h-5"></i>
+            </span>
+            <div>
+              <h2 class="text-xl font-extrabold text-slate-900">Analisis Menu Paling Laris</h2>
+              <p class="text-xs text-slate-500">Matriks Kasavana & Smith (Stars, Workhorses, Puzzles) berdasarkan penjualan riil usaha Anda</p>
+            </div>
+          </div>
+          <div class="flex flex-wrap items-center gap-2 text-xs">
+            <span class="px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold">⭐️ Star (Laba Besar & Laris)</span>
+            <span class="px-2.5 py-1 rounded-lg bg-blue-50 text-blue-700 border border-blue-200 font-bold">🐎 Workhorse (Penarik Volume)</span>
+            <span class="px-2.5 py-1 rounded-lg bg-amber-50 text-amber-700 border border-amber-200 font-bold">🧩 Puzzle (Potensi Tertidur)</span>
+          </div>
+        </div>
+
+        <div class="rounded-xl border border-orange-200 bg-orange-50/40 overflow-x-auto">
+          <div class="px-5 pt-4">
+            <h3 class="font-bold text-slate-800 text-sm flex items-center gap-1.5">
+              <i data-lucide="tags" class="w-4 h-4 text-orange-600"></i> Katalog Harga Menu Aktif
+            </h3>
+            <p class="text-[11px] text-slate-500 mt-1 mb-3">Harga jual tersinkron dari database menu Resto-AI.</p>
+          </div>
+          <table class="w-full text-left border-collapse text-xs">
+            <thead class="bg-white text-slate-700 font-bold border-y border-orange-200">
+              <tr>
+                <th class="py-2.5 px-4 w-12 text-center">No.</th>
+                <th class="py-2.5 px-4">Nama Menu</th>
+                <th class="py-2.5 px-4">Keterangan</th>
+                <th class="py-2.5 px-4 text-right">Harga Jual</th>
+                <th class="py-2.5 px-4 text-center">Status</th>
+              </tr>
+            </thead>
+            <tbody id="menu-price-catalog-body" class="divide-y divide-orange-100 text-slate-700 bg-white">
+              <!-- Dynamically populated -->
+            </tbody>
+          </table>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div class="lg:col-span-2 bg-slate-50 p-5 rounded-xl border border-slate-200">
+            <h3 class="font-bold text-slate-800 text-sm mb-1 flex items-center gap-1.5">
+              <i data-lucide="bar-chart-2" class="w-4 h-4 text-orange-600"></i> Top 8 Menu: Jumlah Porsi vs Kontribusi Omzet
+            </h3>
+            <p class="text-[11px] text-slate-500 mb-3">Perbandingan volume penjualan terhadap pendapatan</p>
+            <div class="relative h-72 w-full">
+              <canvas id="menuRankingChart"></canvas>
+            </div>
+          </div>
+          <div class="bg-gradient-to-br from-orange-50 via-amber-50 to-white p-5 rounded-xl border border-orange-200">
+            <div>
+              <h3 class="font-bold text-orange-950 text-sm flex items-center gap-1.5 mb-3">
+                <i data-lucide="sparkles" class="w-4 h-4 text-orange-600"></i> Analisis Menu Otomatis
+              </h3>
+              <p class="text-xs text-slate-700 leading-relaxed" id="h-menu-analysis">
+                …
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div class="overflow-x-auto rounded-xl border border-slate-200">
+          <table class="w-full text-left border-collapse text-xs">
+            <thead class="bg-slate-100 text-slate-700 font-bold border-b border-slate-200">
+              <tr>
+                <th class="py-3 px-4 w-12 text-center">Rank</th>
+                <th class="py-3 px-4">Nama Menu</th>
+                <th class="py-3 px-4">Kategori</th>
+                <th class="py-3 px-4 text-center">Porsi Terjual</th>
+                <th class="py-3 px-4">Harga Jual</th>
+                <th class="py-3 px-4 text-emerald-700">Total Omzet</th>
+                <th class="py-3 px-4 text-indigo-700">Laba Kotor</th>
+                <th class="py-3 px-4 text-center">Margin %</th>
+                <th class="py-3 px-4">Klasifikasi Matrix & Aksi AI</th>
+              </tr>
+            </thead>
+            <tbody id="top-menu-table-body" class="divide-y divide-slate-100 text-slate-700 bg-white">
+              <!-- Dynamically populated -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================================================== -->
+
+    <!-- ============================================================== -->
+
+    <!-- ============================================================== -->
+
+  
+    <!-- ============================================================== -->
+
+  </main>
+
+  <!-- MODAL DETAIL BELANJAAN PER TANGGAL -->
+  <div id="modal-belanja" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-2xl w-full max-h-[85vh] flex flex-col shadow-2xl border border-slate-200 overflow-hidden">
+      <div class="p-5 border-b border-slate-200 flex items-center justify-between bg-slate-50">
+        <div>
+          <h3 id="modal-title" class="font-bold text-slate-900 text-base">Rincian Nota Belanja Masuk</h3>
+          <p id="modal-subtitle" class="text-xs text-slate-500">Daftar item bahan dan perlengkapan yang dibeli</p>
+        </div>
+        <button onclick="closeModal()" class="w-8 h-8 rounded-lg bg-slate-200 text-slate-600 hover:bg-slate-300 flex items-center justify-center font-bold">
+          ✕
+        </button>
+      </div>
+      <div class="p-5 overflow-y-auto flex-1">
+        <table class="w-full text-left border-collapse text-xs">
+          <thead class="bg-slate-100 text-slate-700 font-bold border-b border-slate-200">
+            <tr>
+              <th class="py-2 px-3">Nama Barang</th>
+              <th class="py-2 px-3">Kategori</th>
+              <th class="py-2 px-3 text-right">Kuantitas</th>
+              <th class="py-2 px-3 text-right">Harga Satuan</th>
+              <th class="py-2 px-3 text-right font-bold text-slate-900">Subtotal</th>
+            </tr>
+          </thead>
+          <tbody id="modal-items-body" class="divide-y divide-slate-100">
+            <!-- Dynamically populated -->
+          </tbody>
+        </table>
+      </div>
+      <div class="p-4 border-t border-slate-200 bg-slate-50 flex items-center justify-between">
+        <span class="text-xs text-slate-500">Total Belanja Hari Ini:</span>
+        <span id="modal-total" class="text-base font-extrabold text-indigo-950">Rp 0</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- JAVASCRIPT LOGIC -->
+  <script>
+    let globalData = {};
+    let trendChartInstance = null;
+    let costChartInstance = null;
+    let menuRankingChartInstance = null;
+    let monthlyGrowthChartInstance = null;
+
+    function formatRp(val) {
+      return 'Rp ' + Number(val || 0).toLocaleString('id-ID');
+    }
+
+    function switchTab(tabId) {
+      document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+      document.querySelectorAll('nav button').forEach(el => {
+        el.classList.remove('tab-active');
+        el.classList.add('hover:text-slate-800');
+      });
+
+      const selectedTab = document.getElementById('tab-' + tabId);
+      const selectedBtn = document.getElementById('tab-btn-' + tabId);
+
+      if (selectedTab) selectedTab.classList.remove('hidden');
+      if (selectedBtn) {
+        selectedBtn.classList.add('tab-active');
+        selectedBtn.classList.remove('hover:text-slate-800');
+      }
+
+      // Trigger re-render of charts if tab has charts
+      setTimeout(() => {
+        if (tabId === 'overview') {
+          if (trendChartInstance) trendChartInstance.resize();
+          if (monthlyGrowthChartInstance) monthlyGrowthChartInstance.resize();
+        }
+        if (tabId === 'menu' && menuRankingChartInstance) menuRankingChartInstance.resize();
+      }, 50);
+    }
+
+    async function fetchData() {
+      const errBox = document.getElementById('data-error-box');
+      try {
+        if (errBox) errBox.classList.add('hidden');
+        const res = await fetch('/api/dashboard/data?t=' + Date.now(), { cache: 'no-store' });
+        if (!res.ok) throw new Error('Server merespons ' + res.status);
+        const ct = res.headers.get('content-type') || '';
+        if (!ct.includes('application/json')) throw new Error('Sesi berakhir — muat ulang halaman (F5) lalu login kembali.');
+        globalData = await res.json();
+        renderAll(globalData);
+      } catch (err) {
+        console.error("Gagal mengambil data:", err);
+        if (errBox) {
+          errBox.innerText = 'Gagal memuat data: ' + err.message;
+          errBox.classList.remove('hidden');
+        }
+      }
+    }
+
+    function safe(fn, label) {
+      try { fn(); } catch (err) {
+        console.error('Render gagal pada ' + label + ':', err);
+        const errBox = document.getElementById('data-error-box');
+        if (errBox) { errBox.innerText = 'Gagal merender bagian ' + label + ': ' + err.message; errBox.classList.remove('hidden'); }
+      }
+    }
+
+    function renderAll(data) {
+      const kpi = data.kpi || {};
+      const charts = data.charts || {};
+      const records = data.daily_records || [];
+      const topMenus = data.top_menus || [];
+      const menuCatalog = data.menu_catalog || [];
+      const purchasing = data.purchasing || {};
+      const income = data.income_statement || {};
+      // Helper global untuk semua blok render (hindari TDZ antar-blok)
+      const _set = (id, v) => { const el = document.getElementById(id); if (el) el.innerText = v; };
+
+      // 1. Hero & Overview KPIs
+      safe(() => {
+      document.getElementById('hero-period').innerText = (data.business && data.business.period) || '';
+      const bizNameEl = document.getElementById('biz-name');
+      if (bizNameEl) bizNameEl.innerText = (data.business && data.business.name) || 'NAMA USAHA';
+      const bizLocEl = document.getElementById('biz-location');
+      if (bizLocEl) bizLocEl.innerText = (data.business && data.business.location) || '';
+      document.getElementById('hero-total-omzet').innerText = formatRp(kpi.total_omzet_period);
+      document.getElementById('hero-avg-omzet').innerText = 'Rata-rata: ' + formatRp(kpi.avg_daily_omzet) + ' / hari';
+      document.getElementById('kpi-growth').innerText = '+' + Number(kpi.avg_mom_growth || 0).toFixed(1).replace('.', ',') + '% MoM';
+      document.getElementById('hero-fixed-cost').innerText = formatRp(kpi.monthly_fixed_cost);
+      document.getElementById('hero-net-profit').innerText = formatRp(kpi.total_net_profit);
+      document.getElementById('hero-margin').innerText = 'Margin: ' + kpi.avg_margin_percent + '% Bersih';
+
+      document.getElementById('ov-omzet').innerText = formatRp(kpi.avg_daily_omzet);
+      document.getElementById('ov-hpp').innerText = formatRp(kpi.avg_daily_hpp);
+      document.getElementById('ov-fixed').innerText = formatRp(kpi.daily_fixed_cost);
+      document.getElementById('ov-profit').innerText = formatRp(kpi.avg_daily_profit);
+      if (document.getElementById('ov-purchase')) document.getElementById('ov-purchase').innerText = formatRp(purchasing.avg_daily_purchase);
+      if (document.getElementById('ov-stockval')) document.getElementById('ov-stockval').innerText = formatRp(kpi.total_inventory_value);
+      // Badge & widget dinamis dari API hemat (self-contained)
+      const _fx = data.fixed_costs_view || {};
+      _set('ov-hpp-ratio', '~' + (income.cogs ? income.cogs.cogs_percentage : 0) + '% Food Cost');
+      _set('ov-margin-note', 'Margin ' + (kpi.avg_margin_percent || 0) + '%');
+      _set('cs-h-payroll', formatRp(_fx.monthly_payroll || 0) + ' / bulan');
+      _set('cs-h-rent', formatRp(_fx.monthly_rent || 0) + ' / bulan');
+      _set('cs-h-util', formatRp(_fx.monthly_electricity_and_water || 0) + ' / bulan');
+      // Kartu belanja: total dari purchasing_summary; kartu kategori tampil hanya jika breakdown ada
+      const _ps = data.purchasing_detail || {};
+      _set('h-pur-total', formatRp(_ps.total_belanja_bulan || 0));
+      _set('h-pur-period', _ps.period || 'Periode berjalan');
+      _set('h-pur-badge', 'Total Belanja: ' + formatRp(_ps.total_belanja_bulan || 0));
+      // Kartu agregat belanja hemat (tanpa breakdown kategori): rata-rata & jumlah entri
+      const _dpH = (_ps.daily_purchases || []);
+      if (_dpH.length) {
+        const _avgH = _dpH.reduce((a, d) => a + (d.total_belanja || 0), 0) / _dpH.length;
+        _set('h-pur-avg', formatRp(Math.round(_avgH)));
+        _set('h-pur-count', _dpH.length + ' entri belanja tercatat');
+      }
+      const _brk = _ps.breakdown || null;
+      const _hasBrk = _brk && (_brk.dapur_pasar || _brk.minuman || _brk.operasional_perlengkapan);
+      ['dapur', 'minuman', 'ops'].forEach(k => {
+        const card = document.getElementById('h-pur-card-' + k);
+        if (card && !_hasBrk) card.style.display = 'none';
+      });
+      const _donutLegend = document.querySelector('#purchasingDonutChart') ? document.getElementById('h-pur-dapur-legend') : null;
+      if (_hasBrk) {
+        const _tot = (_brk.dapur_pasar ? _brk.dapur_pasar.total : 0) + (_brk.minuman ? _brk.minuman.total : 0) + (_brk.operasional_perlengkapan ? _brk.operasional_perlengkapan.total : 0);
+        const _pc = v => _tot ? (v / _tot * 100).toFixed(1) + '%' : '0%';
+        _set('h-pur-dapur', formatRp(_brk.dapur_pasar ? _brk.dapur_pasar.total : 0));
+        _set('h-pur-dapur-note', _pc(_brk.dapur_pasar ? _brk.dapur_pasar.total : 0));
+        _set('h-pur-minuman', formatRp(_brk.minuman ? _brk.minuman.total : 0));
+        _set('h-pur-minuman-note', _pc(_brk.minuman ? _brk.minuman.total : 0));
+        _set('h-pur-ops', formatRp(_brk.operasional_perlengkapan ? _brk.operasional_perlengkapan.total : 0));
+        _set('h-pur-ops-note', _pc(_brk.operasional_perlengkapan ? _brk.operasional_perlengkapan.total : 0));
+        _set('h-pur-dapur-legend', formatRp(_brk.dapur_pasar ? _brk.dapur_pasar.total : 0) + ' (' + _pc(_brk.dapur_pasar ? _brk.dapur_pasar.total : 0) + ')');
+        _set('h-pur-minuman-legend', formatRp(_brk.minuman ? _brk.minuman.total : 0) + ' (' + _pc(_brk.minuman ? _brk.minuman.total : 0) + ')');
+        _set('h-pur-ops-legend', formatRp(_brk.operasional_perlengkapan ? _brk.operasional_perlengkapan.total : 0) + ' (' + _pc(_brk.operasional_perlengkapan ? _brk.operasional_perlengkapan.total : 0) + ')');
+      } else {
+        const _lgD = document.getElementById('h-pur-dapur-legend');
+        if (_lgD) _lgD.closest('.pt-3').style.display = 'none';
+      }
+
+      // 6-Month Growth KPIs & Table Population
+      const sixMo = data.six_month_summary || {};
+      const monthlyGrowth = data.monthly_growth || [];
+      // Narasi insight DINAMIS dari data riil aplikasi hemat
+      if (monthlyGrowth.length > 1) {
+        const _m0 = monthlyGrowth[0], _mL = monthlyGrowth[monthlyGrowth.length - 1];
+        const _fjt = v => (v / 1000000).toFixed(1).replace('.', ',') + ' Juta';
+        const _growths = monthlyGrowth.slice(1).map(m => Number(m.growth_percent || 0));
+        const _gMin = Math.min(..._growths), _gMax = Math.max(..._growths);
+        const _lb0 = _m0.laba_bersih || 0, _lbL = _mL.laba_bersih || 0;
+        const _deltaPct = _lb0 ? Math.round((_lbL - _lb0) / _lb0 * 100) : 0;
+        _set('h-insight-narrative', 'Melalui implementasi sistem otomatisasi Resto-AI (Waitress AI WhatsApp, KDS Dapur Real-time, dan Kontrol Food Cost Bahan Baku), restoran membukukan tren pertumbuhan omzet <b>variatif +' + String(_gMin).replace('.', ',') + '% hingga +' + String(_gMax).replace('.', ',') + '% setiap bulan</b>, dari <b>' + _fjt(_m0.omzet || 0) + '</b> (April baseline) tumbuh menjadi <b>' + _fjt(_mL.omzet || 0) + '</b> (' + (_mL.month_name || '').replace(' 2026', '') + ').');
+        _set('h-insight-laba-delta', (_deltaPct >= 0 ? '+' : '') + _deltaPct + '% (' + _fjt(_lb0) + ' → ' + _fjt(_lbL) + ')');
+      }
+      if (document.getElementById('six-mo-omzet')) {
+        document.getElementById('six-mo-omzet').innerText = formatRp(sixMo.total_revenue || 0);
+      }
+      if (document.getElementById('six-mo-profit')) {
+        document.getElementById('six-mo-profit').innerText = formatRp(sixMo.total_net_profit || 0);
+      }
+      if (document.getElementById('six-mo-orders')) {
+        document.getElementById('six-mo-orders').innerText = ((sixMo.total_orders || 0).toLocaleString('id-ID')) + ' Transaksi';
+      }
+      if (document.getElementById('ov-alltime')) {
+        document.getElementById('ov-alltime').innerText = formatRp(sixMo.total_revenue || 0);
+      }
+
+      // Populate 6-Month Growth Table
+      const growthTbody = document.getElementById('monthly-growth-table-body');
+      if (growthTbody && monthlyGrowth.length > 0) {
+        growthTbody.innerHTML = '';
+        monthlyGrowth.forEach((mg, idx) => {
+          let badgeGrowth = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-700">Baseline</span>';
+          if (idx > 0) {
+            badgeGrowth = `<span class="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-300 inline-flex items-center gap-1"><i data-lucide="trending-up" class="w-3 h-3 text-emerald-600"></i> +${Number(mg.growth_percent).toFixed(1)}%</span>`;
+          }
+          let statusBadge = 'bg-slate-100 text-slate-700 border-slate-200';
+          if (mg.status && mg.status.includes('Data Asli')) {
+            statusBadge = 'bg-orange-100 text-orange-800 border-orange-300 font-extrabold';
+          } else if (idx > 0) {
+            statusBadge = 'bg-emerald-50 text-emerald-700 border-emerald-200 font-bold';
+          }
+
+          growthTbody.innerHTML += `
+            <tr class="hover:bg-slate-50 transition">
+              <td class="py-3 px-4 font-bold text-slate-900">${mg.month_name}</td>
+              <td class="py-3 px-4 font-extrabold text-emerald-700">${formatRp(mg.omzet)}</td>
+              <td class="py-3 px-4 font-medium text-amber-700">${formatRp(mg.hpp)}</td>
+              <td class="py-3 px-4 font-medium">${formatRp(mg.laba_kotor)}</td>
+              <td class="py-3 px-4 text-slate-500">${formatRp(mg.beban_tetap)}</td>
+              <td class="py-3 px-4 font-extrabold text-indigo-700">${formatRp(mg.laba_bersih)}</td>
+              <td class="py-3 px-4 text-center font-bold text-slate-800">${mg.margin_percent}%</td>
+              <td class="py-3 px-4 text-center">${badgeGrowth}</td>
+              <td class="py-3 px-4 text-center">
+                <span class="px-2.5 py-0.5 rounded text-[10px] border ${statusBadge}">${mg.status}</span>
+              </td>
+            </tr>
+          `;
+        });
+      }
+
+      });
+      // 2. Income Statement (P&L Tab)
+      safe(() => {
+      if (income.revenue) {
+        const opexH = income.operating_expenses || {};
+        document.getElementById('pnl-rev-total').innerText = formatRp(income.revenue.total_revenue);
+        document.getElementById('pnl-rev-food').innerText = formatRp(income.revenue.gross_food_sales);
+        document.getElementById('pnl-rev-drink').innerText = formatRp(income.revenue.gross_beverage_sales);
+        document.getElementById('pnl-cogs-total').innerText = formatRp(income.cogs.total_cogs);
+        const _cogsFood = document.getElementById('pnl-cogs-food');
+        if (_cogsFood) _cogsFood.innerText = formatRp(income.cogs.food_ingredients);
+        const _cogsBev = document.getElementById('pnl-cogs-bev');
+        if (_cogsBev) _cogsBev.innerText = formatRp(income.cogs.beverage_ingredients);
+        document.getElementById('pnl-cogs-ratio').innerText = income.cogs.cogs_percentage + '% dari Omzet';
+        document.getElementById('pnl-gross-profit').innerText = formatRp(income.gross_profit) + ' (' + (100 - income.cogs.cogs_percentage).toFixed(1) + '%)';
+        const _opexTotalH = document.getElementById('pnl-opex-total');
+        if (_opexTotalH) _opexTotalH.innerText = formatRp(opexH.total_operating_expenses || 0);
+        // Komposisi OPEX dirender DINAMIS dari data API (baris 0 otomatis disembunyikan)
+        const _opexItemsH = document.getElementById('pnl-opex-items');
+        if (_opexItemsH) {
+          const _rowsH = [
+            ['Payroll (Owner & Karyawan, prorata periode berjalan)', opexH.total_payroll],
+            ['Utilitas Listrik & Air (prorata periode berjalan)', opexH.utilities_water_electricity],
+            ['Sewa Tempat (prorata periode berjalan)', opexH.rent],
+            ['Gas, Internet & Lain-lain (prorata periode berjalan)', opexH.gas_internet_lain]
+          ].filter(r => r[1]);
+          _opexItemsH.innerHTML = _rowsH.map(r =>
+            '<div class="flex justify-between"><span>' + r[0] + '</span><span>' + formatRp(r[1] || 0) + '</span></div>'
+          ).join('');
+        }
+        document.getElementById('pnl-net-profit').innerHTML = formatRp(income.net_profit) + '<br><span class="text-xs text-emerald-700 font-bold">Margin Bersih: ' + income.net_margin_percent + '%</span>';
+      }
+
+      // Populate PnL Table
+      const pnlTbody = document.getElementById('pnl-table-body');
+      pnlTbody.innerHTML = '';
+      records.forEach(r => {
+        pnlTbody.innerHTML += `
+          <tr class="hover:bg-slate-50 transition">
+            <td class="py-2.5 px-4 font-bold text-slate-900">${r.tanggal}</td>
+            <td class="py-2.5 px-4 font-medium text-emerald-700">${formatRp(r.estimasi_omzet)}</td>
+            <td class="py-2.5 px-4 font-medium text-amber-700">${formatRp(r.pemakaian_hpp)}</td>
+            <td class="py-2.5 px-4 font-medium">${formatRp(r.laba_kotor)}</td>
+            <td class="py-2.5 px-4 text-slate-500">${formatRp(r.beban_tetap)}</td>
+            <td class="py-2.5 px-4 font-bold text-indigo-700">${formatRp(r.laba_bersih)}</td>
+            <td class="py-2.5 px-4 font-semibold">${r.margin_persen}%</td>
+          </tr>
+        `;
+      });
+
+      });
+      // 3. Purchasing Tab
+      safe(() => {
+      const belanjaTbody = document.getElementById('belanja-table-body');
+      belanjaTbody.innerHTML = '';
+      const dailyPurchases = purchasing.daily_purchases || [];
+      dailyPurchases.forEach((dp, idx) => {
+        belanjaTbody.innerHTML += `
+          <tr class="hover:bg-slate-50 transition">
+            <td class="py-2.5 px-4 font-bold text-slate-900">${dp.tanggal}</td>
+            <td class="py-2.5 px-4 font-extrabold text-indigo-950">${formatRp(dp.total_belanja)}</td>
+            <td class="py-2.5 px-4 text-center font-semibold text-slate-700">${dp.items_count} item</td>
+            <td class="py-2.5 px-4 text-center">
+              <button onclick="openModal(${idx})" class="px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded text-[11px] font-bold transition">
+                📄 Rincian Nota
+              </button>
+            </td>
+          </tr>
+        `;
+      });
+
+      });
+      // 4. Top Menus Tab
+      safe(() => {
+      const topMenuTbody = document.getElementById('top-menu-table-body');
+      topMenuTbody.innerHTML = '';
+      topMenus.forEach(m => {
+        let badgeClass = 'bg-slate-100 text-slate-700';
+        let badgeIcon = '📋';
+        if (m.badge_type === 'star') {
+          badgeClass = 'bg-emerald-100 text-emerald-800 border border-emerald-200';
+          badgeIcon = '⭐️';
+        } else if (m.badge_type === 'workhorse') {
+          badgeClass = 'bg-blue-100 text-blue-800 border border-blue-200';
+          badgeIcon = '🐎';
+        } else if (m.badge_type === 'puzzle') {
+          badgeClass = 'bg-amber-100 text-amber-800 border border-amber-200';
+          badgeIcon = '🧩';
+        }
+
+        topMenuTbody.innerHTML += `
+          <tr class="hover:bg-slate-50 transition">
+            <td class="py-3 px-4 text-center font-bold text-slate-800">#${m.rank}</td>
+            <td class="py-3 px-4">
+              <span class="font-bold text-slate-900 block">${m.name}</span>
+              <span class="text-[11px] text-slate-400">${m.category}</span>
+            </td>
+            <td class="py-3 px-4 text-slate-600">${m.category}</td>
+            <td class="py-3 px-4 text-center font-extrabold text-orange-600 text-sm">${m.sold_qty} <span class="text-[10px] text-slate-400 font-normal">porsi</span></td>
+            <td class="py-3 px-4 font-medium">${formatRp(m.price)}</td>
+            <td class="py-3 px-4 font-bold text-emerald-700">${formatRp(m.revenue)}</td>
+            <td class="py-3 px-4 font-bold text-indigo-700">${formatRp(m.gross_profit)}</td>
+            <td class="py-3 px-4 text-center font-bold text-slate-800">${m.margin_percent}%</td>
+            <td class="py-3 px-4 max-w-xs">
+              <span class="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full ${badgeClass} mb-1">
+                ${badgeIcon} ${m.classification}
+              </span>
+              <p class="text-[11px] text-slate-600 leading-snug">${m.ai_strategy}</p>
+            </td>
+          </tr>
+        `;
+      });
+
+      // Live menu price catalog
+      const menuCatalogTbody = document.getElementById('menu-price-catalog-body');
+      if (menuCatalogTbody) {
+        menuCatalogTbody.innerHTML = '';
+        menuCatalog.forEach((item, idx) => {
+          menuCatalogTbody.innerHTML += `
+            <tr class="hover:bg-orange-50/60 transition">
+              <td class="py-2.5 px-4 text-center font-bold text-slate-500">${idx + 1}</td>
+              <td class="py-2.5 px-4 font-bold text-slate-900">${item.name}</td>
+              <td class="py-2.5 px-4 text-slate-500">${item.description || '—'}</td>
+              <td class="py-2.5 px-4 text-right font-extrabold text-orange-700">${formatRp(item.price)}</td>
+              <td class="py-2.5 px-4 text-center"><span class="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold">Aktif</span></td>
+            </tr>
+          `;
+        });
+      }
+
+      });
+      // 5. Analisis menu otomatis (dinamis dari top_menus riil aplikasi hemat)
+      safe(() => {
+        if (topMenus.length) {
+          const _star = topMenus.find(m => m.badge_type === 'star') || topMenus[0];
+          const _fjtM = v => (v / 1000000).toFixed(1).replace('.', ',') + ' Juta';
+          _set('h-menu-analysis',
+            'Menu paling sehat saat ini: <b class="text-emerald-700">' + (_star.name || '-') + '</b> — terjual <b>' + Number(_star.sold_qty || 0).toLocaleString('id-ID') + ' porsi</b> menyumbang omzet <b>' + _fjtM(_star.revenue || 0) + '</b> dengan laba kotor <b>' + _fjtM(_star.gross_profit || 0) + '</b> (margin ' + (Number(_star.unit_margin_percent || _star.margin_percent || 0)).toFixed(1).replace('.', ',') + '%). Total ' + topMenus.length + ' menu teratas dianalisis dari penjualan riil periode berjalan.'
+          );
+        } else {
+          const _ma = document.getElementById('h-menu-analysis');
+          if (_ma) _ma.closest('.bg-gradient-to-br').style.display = 'none';
+        }
+      });
+      // 6. Initialize Charts
+      safe(() => renderCharts(charts), 'Grafik');
+
+
+      // Re-trigger lucide icons
+      if (window.lucide) lucide.createIcons();
+    }
+
+    
+    
+    function renderCharts(charts) {
+      // 0. Render 6-Month Growth Chart (Bar Omzet & HPP + Line Net Profit)
+      if (charts.monthly_growth && document.getElementById('monthlyGrowthChart')) {
+        const ctxMonthly = document.getElementById('monthlyGrowthChart').getContext('2d');
+        if (monthlyGrowthChartInstance) monthlyGrowthChartInstance.destroy();
+        monthlyGrowthChartInstance = new Chart(ctxMonthly, {
+          data: {
+            labels: charts.monthly_growth.labels,
+            datasets: [
+              {
+                type: 'line',
+                label: 'Laba Bersih (Rp)',
+                data: charts.monthly_growth.net_profit,
+                borderColor: '#6366f1',
+                backgroundColor: '#6366f1',
+                borderWidth: 3,
+                pointRadius: 6,
+                pointHoverRadius: 8,
+                pointBackgroundColor: '#4f46e5',
+                tension: 0.2,
+                order: 1
+              },
+              {
+                type: 'bar',
+                label: 'Omzet Penjualan (Rp)',
+                data: charts.monthly_growth.omzet,
+                backgroundColor: 'rgba(16, 185, 129, 0.85)',
+                borderColor: '#10b981',
+                borderWidth: 1.5,
+                borderRadius: 8,
+                order: 2
+              },
+              {
+                type: 'bar',
+                label: 'HPP Bahan Baku (Rp)',
+                data: charts.monthly_growth.hpp,
+                backgroundColor: 'rgba(245, 158, 11, 0.75)',
+                borderColor: '#f59e0b',
+                borderWidth: 1.5,
+                borderRadius: 8,
+                order: 3
+              }
+            ]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
+            plugins: {
+              legend: { position: 'top', labels: { font: { family: 'Plus Jakarta Sans', size: 11, weight: 'bold' } } },
+              tooltip: {
+                callbacks: {
+                  label: function(c) {
+                    return c.dataset.label + ': ' + formatRp(c.raw);
+                  },
+                  afterBody: function(items) {
+                    const idx = items[0].dataIndex;
+                    const grow = charts.monthly_growth.growth_rates ? charts.monthly_growth.growth_rates[idx] : 0;
+                    if (idx === 0) return ['Laju Pertumbuhan: Titik Awal Baseline'];
+                    return ['Laju Pertumbuhan MoM: +' + Number(grow).toFixed(1) + '%'];
+                  }
+                }
+              }
+            },
+            scales: {
+              y: {
+                ticks: {
+                  callback: function(val) { return 'Rp ' + (val/1000000).toFixed(0) + ' jt'; }
+                }
+              }
+            }
+          }
+        });
+      }
+
+      // 1. Trend Line Chart
+      const ctxTrend = document.getElementById('trendChart').getContext('2d');
+      if (trendChartInstance) trendChartInstance.destroy();
+      trendChartInstance = new Chart(ctxTrend, {
+        type: 'line',
+        data: {
+          labels: charts.daily_dates,
+          datasets: [
+            {
+              label: 'Estimasi Omzet (Rp)',
+              data: charts.daily_omzet,
+              borderColor: '#10b981',
+              backgroundColor: 'rgba(16, 185, 129, 0.08)',
+              borderWidth: 2,
+              tension: 0.3,
+              fill: true
+            },
+            {
+              label: 'HPP Bahan Baku (Rp)',
+              data: charts.daily_hpp,
+              borderColor: '#f59e0b',
+              backgroundColor: 'transparent',
+              borderWidth: 2,
+              borderDash: [4, 4],
+              tension: 0.3
+            },
+            {
+              label: 'Laba Bersih (Rp)',
+              data: charts.daily_net_profit,
+              borderColor: '#6366f1',
+              backgroundColor: 'rgba(99, 102, 241, 0.1)',
+              borderWidth: 2.5,
+              tension: 0.3,
+              fill: true
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { position: 'top', labels: { font: { family: 'Plus Jakarta Sans', size: 11 } } },
+            tooltip: { callbacks: { label: function(c) { return c.dataset.label + ': ' + formatRp(c.raw); } } }
+          },
+          scales: {
+            y: { ticks: { callback: function(val) { return 'Rp ' + (val/1000000).toFixed(1) + ' jt'; } } }
+          }
+        }
+      });
+
+      // 2. Cost Breakdown Donut
+      const ctxCost = document.getElementById('costChart').getContext('2d');
+      if (costChartInstance) costChartInstance.destroy();
+      costChartInstance = new Chart(ctxCost, {
+        type: 'doughnut',
+        data: {
+          labels: charts.cost_breakdown.labels,
+          datasets: [{
+            data: charts.cost_breakdown.values,
+            backgroundColor: ['#3b82f6', '#ea580c', '#f59e0b', '#10b981', '#f43f5e'],
+            borderWidth: 2,
+            borderColor: '#ffffff'
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 9 } } },
+            tooltip: { callbacks: { label: function(c) { return c.label + ': ' + formatRp(c.raw); } } }
+          }
+        }
+      });
+
+      // 3. Top Spending Horizontal Bar
+
+      // 4. Purchasing Donut
+
+      // 5. Menu Ranking Chart
+      if (charts.menu_ranking) {
+        const ctxMenu = document.getElementById('menuRankingChart').getContext('2d');
+        if (menuRankingChartInstance) menuRankingChartInstance.destroy();
+        menuRankingChartInstance = new Chart(ctxMenu, {
+          type: 'bar',
+          data: {
+            labels: charts.menu_ranking.names,
+            datasets: [{
+              label: 'Porsi Terjual',
+              data: charts.menu_ranking.quantities,
+              backgroundColor: '#ea580c',
+              borderRadius: 5
+            }]
+          },
+          options: {
+            indexAxis: 'y',
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: { position: 'top', labels: { font: { size: 11 } } },
+              tooltip: {
+                callbacks: {
+                  label: function(c) {
+                    const rev = charts.menu_ranking.revenues[c.dataIndex];
+                    return `Porsi: ${c.raw} | Omzet: ${formatRp(rev)}`;
+                  }
+                }
+              }
+            }
+          }
+        });
+      }
+
+    }
+
+    // Modal Details Logic
+    function openModal(index) {
+      const purchasing = globalData.purchasing || {};
+      const day = purchasing.daily_purchases[index];
+      if (!day) return;
+
+      document.getElementById('modal-title').innerText = `Rincian Nota Belanja (${day.tanggal})`;
+      document.getElementById('modal-subtitle').innerText = `Total ${day.items_count} item belanja masuk`;
+      document.getElementById('modal-total').innerText = formatRp(day.total_belanja);
+
+      const tbody = document.getElementById('modal-items-body');
+      tbody.innerHTML = '';
+      (day.details || []).forEach(it => {
+        tbody.innerHTML += `
+          <tr class="hover:bg-slate-50 transition">
+            <td class="py-2 px-3 font-bold text-slate-800">${it.item}</td>
+            <td class="py-2 px-3 text-slate-500">${it.kategori}</td>
+            <td class="py-2 px-3 text-right font-medium">${it.qty}</td>
+            <td class="py-2 px-3 text-right text-slate-600">${formatRp(it.harga)}</td>
+            <td class="py-2 px-3 text-right font-bold text-indigo-950">${formatRp(it.subtotal)}</td>
+          </tr>
+        `;
+      });
+
+      document.getElementById('modal-belanja').classList.remove('hidden');
+    }
+
+    function closeModal() {
+      document.getElementById('modal-belanja').classList.add('hidden');
+    }
+
+    function exportFullDataCSV() {
+      const records = globalData.daily_records || [];
+      let csv = "Tanggal,Omzet,HPP_Bahan,Laba_Kotor,Beban_Tetap,Laba_Bersih,Margin_Persen\n";
+      records.forEach(r => {
+        csv += `${r.tanggal},${r.estimasi_omzet},${r.pemakaian_hpp},${r.laba_kotor},${r.beban_tetap},${r.laba_bersih},${r.margin_persen}\n`;
+      });
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.setAttribute('href', url);
+      a.setAttribute('download', 'Laporan_Keuangan_Nama_Usaha.csv');
+      a.click();
+    }
+
+    function filterPnlTable() {
+      const input = document.getElementById("searchPnlTable").value.toUpperCase();
+      const trs = document.getElementById("pnl-table-body").getElementsByTagName("tr");
+      for (let i = 0; i < trs.length; i++) {
+        const td = trs[i].getElementsByTagName("td")[0];
+        if (td) {
+          const txt = td.textContent || td.innerText;
+          trs[i].style.display = txt.toUpperCase().indexOf(input) > -1 ? "" : "none";
+        }
+      }
+    }
+
+    function filterBelanjaTable() {
+      const input = document.getElementById("searchBelanja").value.toUpperCase();
+      const trs = document.getElementById("belanja-table-body").getElementsByTagName("tr");
+      for (let i = 0; i < trs.length; i++) {
+        const td = trs[i].getElementsByTagName("td")[0];
+        if (td) {
+          const txt = td.textContent || td.innerText;
+          trs[i].style.display = txt.toUpperCase().indexOf(input) > -1 ? "" : "none";
+        }
+      }
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      fetchData();
+      lucide.createIcons();
+    });
+  
+    
+  </script>
+<!-- build: v2-hemat-20261005 -->
+</body>
+</html>

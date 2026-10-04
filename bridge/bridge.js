@@ -1,0 +1,273 @@
+const {
+  default: makeWASocket,
+  useMultiFileAuthState,
+  DisconnectReason,
+  fetchLatestBaileysVersion,
+  downloadMediaMessage
+} = require('@whiskeysockets/baileys');
+const pino = require('pino');
+const path = require('path');
+const fs = require('fs');
+const http = require('http');
+const { execSync } = require('child_process');
+
+const { Boom } = require('@hapi/boom');
+const { findAudioMessage, transcribeIncomingAudio } = require('./voice');
+
+const SESSION_DIR = path.join(__dirname, 'session');
+const RESTO_API_URL = process.env.RESTO_API_URL || 'http://127.0.0.1:18081/api/chat';
+const RESTO_TRANSCRIBE_URL = process.env.RESTO_TRANSCRIBE_URL || 'http://127.0.0.1:18081/api/voice/transcribe';
+const RESTO_VOICE_BRIDGE_TOKEN = process.env.RESTO_VOICE_BRIDGE_TOKEN || '';
+const localVenvPy = path.resolve(__dirname, '../.venv/bin/python');
+const PYTHON_BIN = process.env.PYTHON_BIN || (fs.existsSync(localVenvPy) ? localVenvPy : 'python3');
+
+let rawPhone = (process.env.RESTO_WA_PHONE || '').replace(/[^0-9]/g, '');
+if (rawPhone.startsWith('0')) {
+  rawPhone = '62' + rawPhone.slice(1);
+}
+const PHONE_NUMBER = rawPhone;
+
+let sock = null;
+let reconnectTimer = null;
+let pairingRequested = false;
+
+function scheduleReconnect(delayMs = 3000) {
+  if (reconnectTimer) clearTimeout(reconnectTimer);
+  reconnectTimer = setTimeout(() => {
+    startBridge().catch(console.error);
+  }, delayMs);
+}
+
+async function startBridge() {
+  if (!fs.existsSync(SESSION_DIR)) {
+    fs.mkdirSync(SESSION_DIR, { recursive: true });
+  }
+
+  const { state, saveCreds } = await useMultiFileAuthState(SESSION_DIR);
+  let versionInfo;
+  try {
+    versionInfo = await fetchLatestBaileysVersion();
+  } catch (err) {
+    versionInfo = { version: [2, 3000, 1043857760] };
+  }
+
+  sock = makeWASocket({
+    version: versionInfo.version,
+    auth: state,
+    logger: pino({ level: 'silent' }),
+    printQRInTerminal: false,
+    browser: ['Ubuntu', 'Chrome', '22.04.4'],
+    syncFullHistory: false,
+    markOnlineOnConnect: false,
+    getMessage: async () => ({ conversation: '' })
+  });
+
+  sock.ev.on('creds.update', saveCreds);
+
+  sock.ev.on('connection.update', async (update) => {
+    const { connection, lastDisconnect, qr } = update;
+
+    if (qr) {
+      console.log('New QR code received');
+      const qrTxtPath = path.join(__dirname, 'qr.txt');
+      const qrPngPath = path.join(__dirname, 'qr.png');
+      fs.writeFileSync(qrTxtPath, qr);
+
+      try {
+        execSync(`${PYTHON_BIN} -c "import qrcode; qrcode.make(open('${qrTxtPath}').read()).save('${qrPngPath}')"`);
+        console.log('QR code saved as PNG at ' + qrPngPath);
+      } catch (err) {
+        console.error('Error generating QR PNG:', err.message);
+      }
+
+      if (PHONE_NUMBER && !sock.authState?.creds?.registered && !pairingRequested) {
+        pairingRequested = true;
+        try {
+          console.log(`Requesting pairing code for ${PHONE_NUMBER}...`);
+          const code = await sock.requestPairingCode(PHONE_NUMBER);
+          console.log(`PAIRING_CODE: ${code}`);
+          fs.writeFileSync(path.join(__dirname, 'pairing_code.txt'), code);
+        } catch (err) {
+          console.error('Error requesting pairing code:', err.message);
+          pairingRequested = false;
+        }
+      }
+    }
+
+    if (connection === 'close') {
+      const statusCode = new Boom(lastDisconnect?.error)?.output?.statusCode;
+      const isLoggedOut = statusCode === DisconnectReason.loggedOut;
+
+      if (!sock.authState.creds.registered) {
+        pairingRequested = false;
+      }
+
+      // If unregistered and connection closes, reset session for fresh QR
+      if (isLoggedOut && !sock.authState.creds.registered) {
+        console.log('Unregistered session closed. Resetting session for fresh QR...');
+        try {
+          fs.readdirSync(SESSION_DIR).forEach(file => fs.unlinkSync(path.join(SESSION_DIR, file)));
+        } catch {}
+        scheduleReconnect(2000);
+        return;
+      }
+
+      const shouldReconnect = !isLoggedOut;
+      console.log(`Connection closed (code: ${statusCode}). Reconnecting: ${shouldReconnect}`);
+
+      if (shouldReconnect) {
+        scheduleReconnect(statusCode === 515 ? 1000 : 3000);
+      } else {
+        console.log('Logged out. Please re-pair.');
+      }
+    } else if (connection === 'open') {
+      console.log('WhatsApp connection established successfully! Resto-AI Bot is online.');
+      pairingRequested = false;
+      try {
+        if (fs.existsSync(path.join(__dirname, 'qr.png'))) fs.unlinkSync(path.join(__dirname, 'qr.png'));
+        if (fs.existsSync(path.join(__dirname, 'qr.txt'))) fs.unlinkSync(path.join(__dirname, 'qr.txt'));
+        if (fs.existsSync(path.join(__dirname, 'pairing_code.txt'))) fs.unlinkSync(path.join(__dirname, 'pairing_code.txt'));
+      } catch {}
+      fs.writeFileSync(path.join(__dirname, 'status.json'), JSON.stringify({
+        status: 'connected',
+        user: sock.user?.id || null,
+        phone: PHONE_NUMBER,
+        connected_at: new Date().toISOString()
+      }));
+    }
+  });
+
+  sock.ev.on('messages.upsert', async ({ messages, type }) => {
+    if (type !== 'notify') return;
+
+    for (const m of messages) {
+      if (m.key.fromMe) continue;
+      const remoteJid = m.key.remoteJid;
+      if (!remoteJid || remoteJid.endsWith('@g.us') || remoteJid === 'status@broadcast') continue;
+
+      const text =
+        m.message?.conversation ||
+        m.message?.extendedTextMessage?.text ||
+        m.message?.imageMessage?.caption ||
+        '';
+      const hasVoice = Boolean(findAudioMessage(m.message));
+      if ((!text || !text.trim()) && !hasVoice) continue;
+
+      const senderNumber = remoteJid.split('@')[0];
+      const messageId = m.key.id;
+      let inboundBody = text.trim();
+
+      if (!inboundBody && hasVoice) {
+        try {
+          inboundBody = await transcribeIncomingAudio({
+            message: m,
+            downloadMediaMessage,
+            reuploadRequest: async (message) => sock.updateMediaMessage(message),
+            transcribeUrl: RESTO_TRANSCRIBE_URL,
+            authToken: RESTO_VOICE_BRIDGE_TOKEN,
+          });
+        } catch (err) {
+          console.error(`[Resto-AI] Voice transcription failed for ${senderNumber}: ${err.message}`);
+          await sock.sendMessage(remoteJid, {
+            text: 'Maaf, voice note belum dapat diproses. Silakan kirim ulang dengan durasi lebih singkat atau tuliskan pesan Anda.'
+          }, { quoted: m });
+          continue;
+        }
+        if (!inboundBody) continue;
+        console.log(`[Resto-AI] Voice note transcribed from ${senderNumber} (${inboundBody.length} characters)`);
+      } else {
+        console.log(`[Resto-AI] Incoming from ${senderNumber}: "${inboundBody}"`);
+      }
+
+      try {
+        const response = await fetch(RESTO_API_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            sender: senderNumber,
+            // Preserve the original WhatsApp JID. Some accounts use a LID JID;
+            // routing a reply only by its digits can send to the wrong address.
+            chat_jid: remoteJid,
+            body: inboundBody,
+            message_id: messageId
+          })
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          const hasImage = data.image_path && fs.existsSync(data.image_path);
+          if (hasImage) {
+            console.log(`[Resto-AI] Sending QRIS image ${data.image_path} to ${senderNumber}`);
+            await sock.sendMessage(remoteJid, {
+              image: fs.readFileSync(data.image_path),
+              caption: data.reply || ''
+            }, { quoted: m });
+          } else if (data.reply) {
+            console.log(`[Resto-AI] Replying to ${senderNumber}: "${data.reply.slice(0, 40)}..."`);
+            await sock.sendMessage(remoteJid, { text: data.reply }, { quoted: m });
+          }
+        } else {
+          console.error(`Resto API returned status ${response.status}`);
+        }
+      } catch (err) {
+        console.error('Error forwarding message to Resto-AI API:', err.message);
+      }
+    }
+  });
+}
+
+const BRIDGE_PORT = parseInt(process.env.BRIDGE_PORT || '18082', 10);
+const bridgeServer = http.createServer(async (req, res) => {
+  if (req.method === 'POST' && req.url === '/send') {
+    let body = '';
+    req.on('data', chunk => { body += chunk; });
+    req.on('end', async () => {
+      try {
+        const payload = JSON.parse(body || '{}');
+        const to = payload.to;
+        const text = payload.message || payload.text || '';
+        const imagePath = payload.image_path;
+
+        if (!sock || !to) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          return res.end(JSON.stringify({ error: 'Socket not connected or missing recipient' }));
+        }
+
+        let jid = to;
+        if (!jid.includes('@')) {
+          jid = `${jid.replace(/[^0-9]/g, '')}@s.whatsapp.net`;
+        }
+
+        if (imagePath && fs.existsSync(imagePath)) {
+          console.log(`[Bridge Server] Sending outbound image ${imagePath} to ${jid}`);
+          await sock.sendMessage(jid, {
+            image: fs.readFileSync(imagePath),
+            caption: text
+          });
+        } else if (text) {
+          console.log(`[Bridge Server] Sending outbound text to ${jid}: "${text.slice(0, 40)}..."`);
+          await sock.sendMessage(jid, { text });
+        }
+
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ status: 'ok', jid }));
+      } catch (err) {
+        console.error('Error handling outbound /send request:', err);
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: err.message }));
+      }
+    });
+  } else if (req.method === 'GET' && req.url === '/health') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ status: 'ok', connected: !!sock }));
+  } else {
+    res.writeHead(404, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Not found' }));
+  }
+});
+
+bridgeServer.listen(BRIDGE_PORT, '127.0.0.1', () => {
+  console.log(`[Bridge Server] Outbound HTTP listener active on http://127.0.0.1:${BRIDGE_PORT}`);
+});
+
+startBridge().catch(console.error);
